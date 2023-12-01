@@ -1,47 +1,34 @@
-function convertJsonToCsv(jsonPath) {
 
-    var csvjson = require('csvjson');
-    var fs = require('fs')
-    var json = require(jsonPath);
 
-    let modifiedJson = json.map(e => {
-        let newJson = {
-            Product: e.Product2.Article_SAP_Code__c,
-            PriceEuro: e.UnitPrice,
-            PriceRON: (e.UnitPrice / 0.20).toFixed(2) * 1,
-            isActive: e.IsActive
-        };
+function convertJsonToCsv(json) {
+    const fs = require('fs');
+    const jsonData = require(json);
 
-        return newJson;
-    })
+    const jsonInput = jsonData.records;
 
-    const csvData = csvjson.toCSV(modifiedJson, {
-        headers: 'key',
-    })
+    const processedProductIds = {};
+    const csvOutput = `Product StockKeepingUnit, Price (${jsonInput[0].Pricebook2Id}) EUR, Price (${jsonInput[0].Pricebook2Id}) RON, IsActive\n` +
+        jsonInput.reduce((acc, item) => {
+            const productCode = item.Product2.Article_SAP_Code__c;
 
-    fs.writeFile('./convertedData.csv', csvData, (err) => {
-        if (err) {
-            console.log(err);
-            throw new Error(err);
-        }
-        console.log('Converted successfully')
-    })
-
-    fs.readFile('./convertedData.csv', 'utf-8', (err, fileContent) => {
-        fileContent = fileContent.replace("PriceEuro", `Price (${json[0].Pricebook2Id}) Euro`);
-        fileContent = fileContent.replace("PriceRON", `Price (${json[0].Pricebook2Id}) RON`);
-
-        console.log(fileContent);
-
-        fs.writeFile('./convertedData.csv', fileContent, (err) => {
-            if (err) {
-                console.log(err);
-                throw new Error(err);
+            if (processedProductIds[productCode]) {
+                return acc;
             }
-        })
-    })
 
+            const unitPriceEUR = item.CurrencyIsoCode === 'EUR' ? item.UnitPrice : '';
+            const unitPriceRON = item.CurrencyIsoCode === 'RON' ? item.UnitPrice : '';
+            const isActive = item.IsActive;
 
+            processedProductIds[productCode] = true;
+
+            return `${acc}${productCode}, ${unitPriceEUR}, ${unitPriceRON}, ${isActive}\n`;
+        }, '');
+    
+        const csvName = json.split('/')[2].replace('.json','.csv');
+
+    fs.writeFileSync(csvName, csvOutput);
+
+    console.log("CSV file generated successfully!");
 }
 
 module.exports=convertJsonToCsv;
